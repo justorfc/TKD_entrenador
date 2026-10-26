@@ -1,0 +1,8 @@
+# TKD Entrenador no necesita paquetes externos para ejecutarse (app.py, core.py,
+# historical.py usan solo la biblioteca estándar: tkinter, sqlite3, csv, html,
+# json, math, os, pathlib, datetime).
+#
+# PyInstaller solo se necesita para generar el ejecutable Windows (ver
+# crear_exe_windows.cmd, que ya gestiona su propio entorno .venv_build).
+# Se incluye aquí para quien prefiera compilar desde este mismo entorno .venv.
+pyinstaller>=6.0

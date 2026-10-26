@@ -1,0 +1,9 @@
+.venv/
+.venv_build/
+__pycache__/
+*.pyc
+dist/
+build/
+*.spec
+versiones_compilacion.txt
+*.sqlite3
