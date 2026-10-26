@@ -7,8 +7,8 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
-from core import (Store, age_on, adult_hr, manual_pulse, number, distribute,
-                  build_week, composition, report_html, export_sessions)
+from core import (Store, age_on, adult_hr, manual_pulse, orthostatic_risk, number,
+                  distribute, build_week, composition, report_html, export_sessions)
 from historical import HISTORICAL
 
 
@@ -16,6 +16,14 @@ class Calculations(unittest.TestCase):
     def test_manual_conversion(self):
         self.assertEqual(manual_pulse(15,6),150)
         self.assertEqual(manual_pulse(16,6)-manual_pulse(15,6),10)
+
+    def test_orthostatic_risk(self):
+        below=orthostatic_risk(60,74)
+        self.assertEqual(below['difference'],14);self.assertFalse(below['risk'])
+        above=orthostatic_risk(60,76)
+        self.assertEqual(above['difference'],16);self.assertTrue(above['risk'])
+        boundary=orthostatic_risk(60,75)
+        self.assertFalse(boundary['risk'])
 
     def test_age_birthday(self):
         self.assertEqual(age_on('2008-10-27','2026-10-26'),17)

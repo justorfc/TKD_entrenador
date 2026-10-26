@@ -21,7 +21,9 @@ UNITS = ("minutos", "repeticiones", "asaltos")
 PHASES = ("Preparación general", "Preparación especial", "Precompetición",
           "Competición", "Transición", "Adaptación / retorno")
 MEASURE_TYPES = ("Peso (kg)", "Talla (cm)", "FC basal (lpm)",
-                 "FC reposo (lpm)", "FC durante (lpm)", "FC recuperación (lpm)")
+                 "FC reposo (lpm)", "FC durante (lpm)", "FC recuperación (lpm)",
+                 "FC acostado (lpm)", "FC de pie (lpm)",
+                 "Presión arterial sistólica (mmHg)", "Presión arterial diastólica (mmHg)")
 
 
 def number(value, label, minimum=0, maximum=None):
@@ -54,6 +56,20 @@ def age_on(birth, when):
 def manual_pulse(beats, seconds):
     """Conversión de latidos contados durante un intervalo; no reconstruye FC previa."""
     return number(beats, "Latidos", 1) * 60 / number(seconds, "Segundos", 1)
+
+
+def orthostatic_risk(supine, standing, threshold=15):
+    """Prueba ortostática histórica: acostado tras reposo frente a de pie inmediato.
+
+    Criterio histórico de uso frecuente: una diferencia superior a 15 lpm se
+    asociaba a riesgo de sobreentrenamiento. No es un diagnóstico ni sustituye
+    el criterio del entrenador ni una valoración clínica.
+    """
+    supine_hr = number(supine, "FC acostado", 1, 300)
+    standing_hr = number(standing, "FC de pie", 1, 300)
+    difference = standing_hr - supine_hr
+    return {"supine": supine_hr, "standing": standing_hr, "difference": difference,
+            "risk": difference > number(threshold, "Umbral", 0)}
 
 
 def adult_hr(birth, when, resting, intensity, assessed_max=None):
