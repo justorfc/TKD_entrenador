@@ -19,14 +19,14 @@ duplicar ninguna fórmula ni regla de negocio.
 
 ## Requisitos (comprobados el 26-10-2026)
 
-| Herramienta | Versión usada en esta guía | Notas |
-|---|---|---|
-| Kivy | 2.3.1 (última estable en PyPI) | <https://kivy.org/doc/stable/> |
-| Buildozer | 1.6.0 (última estable en PyPI) | Solo Linux/macOS; en Windows se usa vía WSL2 |
-| python-for-android | gestionado por Buildozer | No fijar versión manualmente salvo que falle el build |
-| Python (máquina de compilación) | 3.11–3.12 recomendado | Kivy 2.3.1 no publica ruedas para Python 3.14 (ver nota) |
-| Java JDK | el que instale Buildozer (OpenJDK 17 vía `sdkmanager`) | Buildozer lo gestiona junto con el Android SDK |
-| Android SDK / NDK | gestionados automáticamente por Buildozer (NDK 28c, API 36, minAPI 24 en `buildozer.spec`) | Se descargan la primera vez, varios GB |
+| Herramienta                       | Versión usada en esta guía                                                                  | Notas                                                       |
+| --------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Kivy                              | 2.3.1 (última estable en PyPI)                                                               | [https://kivy.org/doc/stable/](https://kivy.org/doc/stable/) |
+| Buildozer                         | 1.6.0 (última estable en PyPI)                                                               | Solo Linux/macOS; en Windows se usa vía WSL2               |
+| python-for-android                | gestionado por Buildozer                                                                      | No fijar versión manualmente salvo que falle el build      |
+| Python (máquina de compilación) | 3.11–3.12 recomendado                                                                        | Kivy 2.3.1 no publica ruedas para Python 3.14 (ver nota)    |
+| Java JDK                          | el que instale Buildozer (OpenJDK 17 vía `sdkmanager`)                                     | Buildozer lo gestiona junto con el Android SDK              |
+| Android SDK / NDK                 | gestionados automáticamente por Buildozer (NDK 28c, API 36, minAPI 24 en `buildozer.spec`) | Se descargan la primera vez, varios GB                      |
 
 > **Nota sobre Python 3.14:** al preparar este encargo, el único Python
 > disponible en el PC de desarrollo era 3.14, para el que Kivy 2.3.1 no
@@ -36,34 +36,27 @@ duplicar ninguna fórmula ni regla de negocio.
 > build de Android, por lo que esto solo afecta a las pruebas de la interfaz
 > Kivy *en escritorio*, no a la compilación del APK en sí.
 
-## 1. Preparar WSL2 (recomendado si se compila desde Windows)
 
-Buildozer **no compila en Windows nativo**: funciona en Linux o macOS. En un
-PC con Windows, la vía recomendada es WSL2.
 
-```powershell
-wsl --install
-# Reiniciar si se pide, y crear un usuario Ubuntu la primera vez.
-```
+## 1. Preparar el entorno de compilación Linux (Fedora nativo o WSL2 en Windows)
 
-Dentro de la distribución Linux de WSL2, trabaje siempre en el **sistema de
-archivos de Linux** (por ejemplo `~/tkd_entrenador`), no en `/mnt/c/...`: la
-compilación con rutas de Windows dentro de WSL2 es mucho más lenta y puede
-fallar por permisos o por símlinks no soportados en NTFS.
+Buildozer **no compila en Windows nativo**: funciona en Linux o macOS. Hay dos
+rutas equivalentes; elija una:
+
+- **Opción A — Fedora (Linux nativo, recomendado si ya tiene o puede instalar
+  Fedora):** evita la capa de virtualización de WSL2 y los problemas de
+  rutas/permisos al compilar; es el entorno más simple y más parecido a lo
+  que usan la mayoría de guías de Buildozer.
+- **Opción B — WSL2 sobre Windows:** útil si no quiere salir de Windows, pero
+  requiere instalar/mantener el Subsistema de Windows para Linux y trabajar
+  siempre dentro del sistema de archivos de Linux (ver advertencia abajo).
+
+### Opción A: Fedora (Linux nativo)
 
 ```bash
-# Dentro de WSL2 (Ubuntu):
-sudo apt update
-sudo apt install -y git zip unzip openjdk-17-jdk python3-pip python3-venv \
-    build-essential libffi-dev libssl-dev autoconf automake libtool pkg-config \
-    libltdl-dev cmake
-git clone <url-de-este-repositorio> ~/tkd_entrenador
-cd ~/tkd_entrenador
-git checkout feature/android-kivy
-python3 -m venv .venv_build_android
-source .venv_build_android/bin/activate
-pip install --upgrade pip
-pip install buildozer==1.6.0 cython
+sudo dnf install -y git zip unzip java-17-openjdk-devel python3-pip \
+    gcc gcc-c++ make autoconf automake libtool pkgconf-pkg-config \
+    libffi-devel openssl-devel ncurses-compat-libs zlib-devel cmake patch which
 ```
 
 ## 2. Compilar un APK de depuración

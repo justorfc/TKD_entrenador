@@ -1,0 +1,131 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "edit-build-android-fedora-section",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const fs = require('fs');\nconst path = 'C:/TKD_Entrenador/BUILD_ANDROID.md';\nconst text = fs.readFileSync(path, 'utf8');\nconst lines = text.split(/\\r?\\n/);\nif (!/^## 1\\. Preparar WSL2/.test(lines[38])) { console.log('ABORT_39:' + lines[38]); process.exit(1); }\nif (!/^## 2\\. Compilar un APK/.test(lines[68])) { console.log('ABORT_69:' + lines[68]); process.exit(1); }\nconst before = lines.slice(0, 38);\nconst after = lines.slice(68);\nconst newSection = [\n'## 1. Preparar el entorno de compilacion Linux (Fedora nativo o WSL2 en Windows)',\n'',\n'Buildozer **no compila en Windows nativo**: funciona en Linux o macOS. Hay dos',\n'rutas equivalentes; elija una:',\n'',\n'- **Opcion A - Fedora (Linux nativo, recomendado si ya tiene o puede instalar',\n'  Fedora):** evita la capa de virtualizacion de WSL2 y los problemas de',\n'  rutas/permisos al compilar; es el entorno mas simple y mas parecido a lo',\n'  que usan la mayoria de guias de Buildozer.',\n'- **Opcion B - WSL2 sobre Windows:** util si no quiere salir de Windows, pero',\n'  requiere instalar/mantener el Subsistema de Windows para Linux y trabajar',\n'  siempre dentro del sistema de archivos de Linux (ver advertencia abajo).',\n'',\n'### Opcion A: Fedora (Linux nativo)',\n'',\n'```bash',\n'sudo dnf install -y git zip unzip java-17-openjdk-devel python3-pip \\\\',\n'    gcc gcc-c++ make autoconf automake libtool pkgconf-pkg-config \\\\',\n'    libffi-devel openssl-devel ncurses-compat-libs zlib-devel cmake patch which',\n'```',\n'',\n'Notas especificas de Fedora:',\n'',\n'- `python3-venv` **no existe como paquete aparte**: el modulo `venv` ya viene',\n'  incluido en el `python3` de Fedora, asi que `python3 -m venv` funciona sin',\n'  instalar nada mas.',\n'- `ncurses-compat-libs` sustituye a la `libncurses5` que piden algunas',\n'  versiones de las *build-tools* de Android en distribuciones basadas en',\n'  Debian/Ubuntu; sin este paquete, `aapt`/`aapt2` puede fallar al no',\n'  encontrar `libtinfo.so.5`.',\n'- Si SELinux esta en modo *enforcing* (por defecto en Fedora) no deberia dar',\n'  problemas porque todo el build ocurre dentro de su $HOME, pero si ve',\n'  errores de permisos inesperados al ejecutar binarios descargados por el',\n'  Android SDK, revise `journalctl -t setroubleshoot` o pruebe temporalmente',\n'  `sudo setenforce 0` solo para diagnosticar (no lo deje permanentemente).',\n'- `java-17-openjdk-devel` ya proporciona el JDK 17 que gestiona Buildozer; no',\n'  es necesario instalar el JDK que descarga `sdkmanager` por separado.',\n'',\n'```bash',\n'git clone <url-de-este-repositorio> ~/tkd_entrenador',\n'cd ~/tkd_entrenador',\n'git checkout feature/android-kivy',\n'python3 -m venv .venv_build_android',\n'source .venv_build_android/bin/activate',\n'pip install --upgrade pip',\n'pip install buildozer==1.6.0 cython',\n'```',\n'',\n'A partir de aqui, continue con la seccion 2 (Compilar un APK de depuracion),',\n'mas abajo: los comandos (`buildozer android debug`, `adb`, etc.) son',\n'identicos en Fedora, WSL2 o macOS.',\n'',\n'### Opcion B: WSL2 sobre Windows',\n'',\n'```powershell',\n'wsl --install',\n'# Reiniciar si se pide, y crear un usuario Ubuntu la primera vez.',\n'```',\n'',\n'Dentro de la distribucion Linux de WSL2, trabaje siempre en el **sistema de',\n'archivos de Linux** (por ejemplo `~/tkd_entrenador`), no en `/mnt/c/...`: la',\n'compilacion con rutas de Windows dentro de WSL2 es mucho mas lenta y puede',\n'fallar por permisos o por simlinks no soportados en NTFS.',\n'',\n'```bash',\n'# Dentro de WSL2 (Ubuntu):',\n'sudo apt update',\n'sudo apt install -y git zip unzip openjdk-17-jdk python3-pip python3-venv \\\\',\n'    build-essential libffi-dev libssl-dev autoconf automake libtool pkg-config \\\\',\n'    libltdl-dev cmake',\n'git clone <url-de-este-repositorio> ~/tkd_entrenador',\n'cd ~/tkd_entrenador',\n'git checkout feature/android-kivy',\n'python3 -m venv .venv_build_android',\n'source .venv_build_android/bin/activate',\n'pip install --upgrade pip',\n'pip install buildozer==1.6.0 cython',\n'```',\n''\n];\nconst finalLines = before.concat(newSection, after);\nfs.writeFileSync(path, finalLines.join('\\n'), 'utf8');\nconsole.log('DONE total=' + finalLines.length);\n"
+			]
+		},
+		{
+			"label": "edit-build-android-fedora-section-2",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const fs = require(\"fs\");\nconst path = \"C:/TKD_Entrenador/BUILD_ANDROID.md\";\nconst text = fs.readFileSync(path, \"utf8\");\nconst lines = text.split(/\\r?\\n/);\nif (!/^## 1\\. Preparar WSL2/.test(lines[38])) { console.log(\"ABORT_39:\" + lines[38]); process.exit(1); }\nif (!/^## 2\\. Compilar un APK/.test(lines[68])) { console.log(\"ABORT_69:\" + lines[68]); process.exit(1); }\nconst before = lines.slice(0, 38);\nconst after = lines.slice(68);\nconst newSection = [\n\"## 1. Preparar el entorno de compilacion Linux (Fedora nativo o WSL2 en Windows)\",\n\"\",\n\"Buildozer **no compila en Windows nativo**: funciona en Linux o macOS. Hay dos\",\n\"rutas equivalentes; elija una:\",\n\"\",\n\"- **Opcion A - Fedora (Linux nativo, recomendado si ya tiene o puede instalar\",\n\"  Fedora):** evita la capa de virtualizacion de WSL2 y los problemas de\",\n\"  rutas/permisos al compilar; es el entorno mas simple y mas parecido a lo\",\n\"  que usan la mayoria de guias de Buildozer.\",\n\"- **Opcion B - WSL2 sobre Windows:** util si no quiere salir de Windows, pero\",\n\"  requiere instalar/mantener el Subsistema de Windows para Linux y trabajar\",\n\"  siempre dentro del sistema de archivos de Linux (ver advertencia abajo).\",\n\"\",\n\"### Opcion A: Fedora (Linux nativo)\",\n\"\",\n\"```bash\",\n\"sudo dnf install -y git zip unzip java-17-openjdk-devel python3-pip \\\\\",\n\"    gcc gcc-c++ make autoconf automake libtool pkgconf-pkg-config \\\\\",\n\"    libffi-devel openssl-devel ncurses-compat-libs zlib-devel cmake patch which\",\n\"```\",\n\"\",\n\"Notas especificas de Fedora:\",\n\"\",\n\"- `python3-venv` **no existe como paquete aparte**: el modulo `venv` ya viene\",\n\"  incluido en el `python3` de Fedora, asi que `python3 -m venv` funciona sin\",\n\"  instalar nada mas.\",\n\"- `ncurses-compat-libs` sustituye a la `libncurses5` que piden algunas\",\n\"  versiones de las *build-tools* de Android en distribuciones basadas en\",\n\"  Debian/Ubuntu; sin este paquete, `aapt`/`aapt2` puede fallar al no\",\n\"  encontrar `libtinfo.so.5`.\",\n\"- Si SELinux esta en modo *enforcing* (por defecto en Fedora) no deberia dar\",\n\"  problemas porque todo el build ocurre dentro de su $HOME, pero si ve\",\n\"  errores de permisos inesperados al ejecutar binarios descargados por el\",\n\"  Android SDK, revise `journalctl -t setroubleshoot` o pruebe temporalmente\",\n\"  `sudo setenforce 0` solo para diagnosticar (no lo deje permanentemente).\",\n\"- `java-17-openjdk-devel` ya proporciona el JDK 17 que gestiona Buildozer; no\",\n\"  es necesario instalar el JDK que descarga `sdkmanager` por separado.\",\n\"\",\n\"```bash\",\n\"git clone <url-de-este-repositorio> ~/tkd_entrenador\",\n\"cd ~/tkd_entrenador\",\n\"git checkout feature/android-kivy\",\n\"python3 -m venv .venv_build_android\",\n\"source .venv_build_android/bin/activate\",\n\"pip install --upgrade pip\",\n\"pip install buildozer==1.6.0 cython\",\n\"```\",\n\"\",\n\"A partir de aqui, continue con la seccion 2 (Compilar un APK de depuracion),\",\n\"mas abajo: los comandos (`buildozer android debug`, `adb`, etc.) son\",\n\"identicos en Fedora, WSL2 o macOS.\",\n\"\",\n\"### Opcion B: WSL2 sobre Windows\",\n\"\",\n\"```powershell\",\n\"wsl --install\",\n\"# Reiniciar si se pide, y crear un usuario Ubuntu la primera vez.\",\n\"```\",\n\"\",\n\"Dentro de la distribucion Linux de WSL2, trabaje siempre en el **sistema de\",\n\"archivos de Linux** (por ejemplo `~/tkd_entrenador`), no en `/mnt/c/...`: la\",\n\"compilacion con rutas de Windows dentro de WSL2 es mucho mas lenta y puede\",\n\"fallar por permisos o por simlinks no soportados en NTFS.\",\n\"\",\n\"```bash\",\n\"# Dentro de WSL2 (Ubuntu):\",\n\"sudo apt update\",\n\"sudo apt install -y git zip unzip openjdk-17-jdk python3-pip python3-venv \\\\\",\n\"    build-essential libffi-dev libssl-dev autoconf automake libtool pkg-config \\\\\",\n\"    libltdl-dev cmake\",\n\"git clone <url-de-este-repositorio> ~/tkd_entrenador\",\n\"cd ~/tkd_entrenador\",\n\"git checkout feature/android-kivy\",\n\"python3 -m venv .venv_build_android\",\n\"source .venv_build_android/bin/activate\",\n\"pip install --upgrade pip\",\n\"pip install buildozer==1.6.0 cython\",\n\"```\",\n\"\"\n];\nconst finalLines = before.concat(newSection, after);\nfs.writeFileSync(path, finalLines.join(\"\\n\"), \"utf8\");\nconsole.log(\"DONE total=\" + finalLines.length);\n"
+			]
+		},
+		{
+			"label": "quote-escape-sanity-check",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Write-Output \"test1: ``python3-venv``\"; Write-Output \"test2: `$HOME end\"; Write-Output \"test3 backslash: sudo dnf install -y foo \\\""
+			]
+		},
+		{
+			"label": "quote-test-a",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Write-Output \"test1: ``python3-venv``\""
+			]
+		},
+		{
+			"label": "quote-test-b",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Write-Output \"test2: `$HOME end\""
+			]
+		},
+		{
+			"label": "quote-test-c",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Write-Output \"test3: sudo dnf install -y foo \\\""
+			]
+		},
+		{
+			"label": "edit-build-android-fedora-section-3",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$path = \"C:\\TKD_Entrenador\\BUILD_ANDROID.md\"\n$lines = Get-Content -LiteralPath $path\nif ($lines[38] -notmatch \"^## 1\\. Preparar WSL2\") { Write-Output \"ABORT_39\"; exit 1 }\nif ($lines[68] -notmatch \"^## 2\\. Compilar un APK\") { Write-Output \"ABORT_69\"; exit 1 }\n$before = $lines[0..37]\n$after = $lines[68..($lines.Length-1)]\n$newSection = @(\n\"## 1. Preparar el entorno de compilacion Linux (Fedora nativo o WSL2 en Windows)\",\n\"\",\n\"Buildozer **no compila en Windows nativo**: funciona en Linux o macOS. Hay dos\",\n\"rutas equivalentes; elija una:\",\n\"\",\n\"- **Opcion A - Fedora (Linux nativo, recomendado si ya tiene o puede instalar\",\n\"  Fedora):** evita la capa de virtualizacion de WSL2 y los problemas de\",\n\"  rutas/permisos al compilar; es el entorno mas simple y mas parecido a lo\",\n\"  que usan la mayoria de guias de Buildozer.\",\n\"- **Opcion B - WSL2 sobre Windows:** util si no quiere salir de Windows, pero\",\n\"  requiere instalar/mantener el Subsistema de Windows para Linux y trabajar\",\n\"  siempre dentro del sistema de archivos de Linux (ver advertencia abajo).\",\n\"\",\n\"### Opcion A: Fedora (Linux nativo)\",\n\"\",\n\"```bash\",\n(\"sudo dnf install -y git zip unzip java-17-openjdk-devel python3-pip \" + [char]92),\n(\"    gcc gcc-c++ make autoconf automake libtool pkgconf-pkg-config \" + [char]92),\n\"    libffi-devel openssl-devel ncurses-compat-libs zlib-devel cmake patch which\",\n\"```\",\n\"\",\n\"Notas especificas de Fedora:\",\n\"\",\n\"- ``python3-venv`` **no existe como paquete aparte**: el modulo ``venv`` ya viene\",\n\"  incluido en el ``python3`` de Fedora, asi que ``python3 -m venv`` funciona sin\",\n\"  instalar nada mas.\",\n\"- ``ncurses-compat-libs`` sustituye a la ``libncurses5`` que piden algunas\",\n\"  versiones de las *build-tools* de Android en distribuciones basadas en\",\n\"  Debian/Ubuntu; sin este paquete, ``aapt``/``aapt2`` puede fallar al no\",\n\"  encontrar ``libtinfo.so.5``.\",\n\"- Si SELinux esta en modo *enforcing* (por defecto en Fedora) no deberia dar\",\n\"  problemas porque todo el build ocurre dentro de su `$HOME, pero si ve\",\n\"  errores de permisos inesperados al ejecutar binarios descargados por el\",\n\"  Android SDK, revise ``journalctl -t setroubleshoot`` o pruebe temporalmente\",\n\"  ``sudo setenforce 0`` solo para diagnosticar (no lo deje permanentemente).\",\n\"- ``java-17-openjdk-devel`` ya proporciona el JDK 17 que gestiona Buildozer; no\",\n\"  es necesario instalar el JDK que descarga ``sdkmanager`` por separado.\",\n\"\",\n\"```bash\",\n\"git clone <url-de-este-repositorio> ~/tkd_entrenador\",\n\"cd ~/tkd_entrenador\",\n\"git checkout feature/android-kivy\",\n\"python3 -m venv .venv_build_android\",\n\"source .venv_build_android/bin/activate\",\n\"pip install --upgrade pip\",\n\"pip install buildozer==1.6.0 cython\",\n\"```\",\n\"\",\n\"A partir de aqui, continue con la seccion 2 (Compilar un APK de depuracion),\",\n\"mas abajo: los comandos (``buildozer android debug``, ``adb``, etc.) son\",\n\"identicos en Fedora, WSL2 o macOS.\",\n\"\",\n\"### Opcion B: WSL2 sobre Windows\",\n\"\",\n\"```powershell\",\n\"wsl --install\",\n\"# Reiniciar si se pide, y crear un usuario Ubuntu la primera vez.\",\n\"```\",\n\"\",\n\"Dentro de la distribucion Linux de WSL2, trabaje siempre en el **sistema de\",\n\"archivos de Linux** (por ejemplo ``~/tkd_entrenador``), no en ``/mnt/c/...``: la\",\n\"compilacion con rutas de Windows dentro de WSL2 es mucho mas lenta y puede\",\n\"fallar por permisos o por simlinks no soportados en NTFS.\",\n\"\",\n\"```bash\",\n\"# Dentro de WSL2 (Ubuntu):\",\n\"sudo apt update\",\n(\"sudo apt install -y git zip unzip openjdk-17-jdk python3-pip python3-venv \" + [char]92),\n(\"    build-essential libffi-dev libssl-dev autoconf automake libtool pkg-config \" + [char]92),\n\"    libltdl-dev cmake\",\n\"git clone <url-de-este-repositorio> ~/tkd_entrenador\",\n\"cd ~/tkd_entrenador\",\n\"git checkout feature/android-kivy\",\n\"python3 -m venv .venv_build_android\",\n\"source .venv_build_android/bin/activate\",\n\"pip install --upgrade pip\",\n\"pip install buildozer==1.6.0 cython\",\n\"```\",\n\"\"\n)\n$finalLines = $before + $newSection + $after\n$utf8NoBom = New-Object System.Text.UTF8Encoding($false)\n[System.IO.File]::WriteAllText($path, ($finalLines -join \"`n\") + \"`n\", $utf8NoBom)\nWrite-Output \"DONE total=$($finalLines.Length)\""
+			]
+		},
+		{
+			"label": "quote-test-d",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"if (\"xx\" -notmatch \"^## 1\\. Preparar WSL2\") { Write-Output \"MATCHED_NOTEQUAL\" } else { Write-Output \"WOULD_MATCH\" }"
+			]
+		},
+		{
+			"label": "quote-test-e",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"if (\"\"xx\"\" -notmatch \"\"^## 1\\. Preparar WSL2\"\") { Write-Output \"\"MATCHED_NOTEQUAL\"\" } else { Write-Output \"\"WOULD_MATCH\"\" }"
+			]
+		},
+		{
+			"label": "python-availability-check",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"-c",
+				"print(\"hello world: `backtick` and $HOME and \\\\ backslash\")"
+			]
+		},
+		{
+			"label": "python-multiline-check",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"-c",
+				"x = \"hello `backtick` test\"\ny = \"dollar $HOME test\"\nz = \"backslash test \\\\\"\nprint(x)\nprint(y)\nprint(z)\nprint(\"DONE\")"
+			]
+		},
+		{
+			"label": "quote-test-f-hash",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Write-Output \"contains hash: ## test\""
+			]
+		},
+		{
+			"label": "quote-test-g-singlehash",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Write-Output \"contains hash: # test\""
+			]
+		}
+	]
+}
