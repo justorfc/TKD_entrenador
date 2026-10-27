@@ -8,7 +8,8 @@ import sqlite3
 import tempfile
 import unittest
 from core import (Store, age_on, adult_hr, manual_pulse, orthostatic_risk, number,
-                  distribute, build_week, composition, report_html, export_sessions)
+                  distribute, build_week, composition, report_html, export_sessions,
+                  ORTHOSTATIC_NEUTRAL_MESSAGE, LATEST_VERSION)
 from historical import HISTORICAL
 
 
@@ -19,11 +20,26 @@ class Calculations(unittest.TestCase):
 
     def test_orthostatic_risk(self):
         below=orthostatic_risk(60,74)
-        self.assertEqual(below['difference'],14);self.assertFalse(below['risk'])
+        self.assertEqual(below['difference'],14);self.assertIsNone(below['flagged'])
         above=orthostatic_risk(60,76)
-        self.assertEqual(above['difference'],16);self.assertTrue(above['risk'])
-        boundary=orthostatic_risk(60,75)
-        self.assertFalse(boundary['risk'])
+        self.assertEqual(above['difference'],16);self.assertIsNone(above['flagged'])
+        # Sin umbral configurado (por defecto), nunca se marca ninguna diferencia.
+
+    def test_orthostatic_risk_opt_in_threshold(self):
+        below=orthostatic_risk(60,74,threshold=15)
+        self.assertEqual(below['difference'],14);self.assertFalse(below['flagged'])
+        above=orthostatic_risk(60,76,threshold=15)
+        self.assertEqual(above['difference'],16);self.assertTrue(above['flagged'])
+        boundary=orthostatic_risk(60,75,threshold=15)
+        self.assertFalse(boundary['flagged'])
+        # La diferencia conserva el signo aunque el deportista mejore de pie.
+        improves=orthostatic_risk(70,60,threshold=15)
+        self.assertEqual(improves['difference'],-10)
+        self.assertFalse(improves['flagged'])
+
+    def test_orthostatic_neutral_message_has_no_diagnosis_wording(self):
+        for forbidden in ("diagnóstic", "sobreentrenamiento", "riesgo", "apt"):
+            self.assertNotIn(forbidden, ORTHOSTATIC_NEUTRAL_MESSAGE.lower())
 
     def test_age_birthday(self):
         self.assertEqual(age_on('2008-10-27','2026-10-26'),17)
@@ -90,6 +106,25 @@ class Storage(unittest.TestCase):
         comp=composition(items)
         self.assertEqual(comp['Competitiva'][0],24)
         self.assertAlmostEqual(sum(x[1] for x in comp.values()),100)
+
+    def test_orthostatic_threshold_opt_in_per_athlete(self):
+        # Ningún deportista nuevo tiene umbral activado por defecto.
+        self.assertIsNone(self.s.athlete(self.a)['orthostatic_threshold'])
+        self.s.set_orthostatic_threshold(self.a,15)
+        self.assertEqual(self.s.athlete(self.a)['orthostatic_threshold'],15)
+        self.s.set_orthostatic_threshold(self.a,'')
+        self.assertIsNone(self.s.athlete(self.a)['orthostatic_threshold'])
+        with self.assertRaises(ValueError):
+            self.s.set_orthostatic_threshold(self.a,-1)
+
+    def test_athlete_isolation(self):
+        other=self.s.add_athlete('Otra persona','2000-01-01','Femenino')
+        self.s.set_orthostatic_threshold(self.a,15)
+        self.s.add_measurement(self.a,self.monday,'FC acostado (lpm)',60,'Pulsioxímetro, reposo')
+        self.assertIsNone(self.s.athlete(other)['orthostatic_threshold'])
+        self.assertEqual(len(self.s.rows('SELECT * FROM measurements WHERE athlete_id=?',(other,))),0)
+        self.assertEqual(len(self.s.rows('SELECT * FROM measurements WHERE athlete_id=?',(self.a,))),1)
+
 
     def test_zero_reference_percentage_omits_work(self):
         refs=self.s.rows('SELECT * FROM refs WHERE athlete_id=?',(self.a,))
@@ -177,6 +212,69 @@ class Storage(unittest.TestCase):
         other=self.s.add_athlete('Otro','2001-01-01','Sin registrar')
         with self.assertRaises(ValueError):
             self.s.add_session(other,self.monday,60,5,4,30,20,10,5,'Prueba',plan_id=pid)
+
+
+class Migrations(unittest.TestCase):
+    """Compatibilidad de versiones del esquema (sección 7 del encargo)."""
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.path=Path(self.temp.name)/'data.sqlite3'
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def _legacy_v1_database(self):
+        """Crea una base como la generada por versiones previas (sin la
+        columna orthostatic_threshold), para comprobar la migración real."""
+        from core import SCHEMA_V1
+        db=sqlite3.connect(self.path)
+        db.executescript(SCHEMA_V1)
+        db.execute("PRAGMA user_version=1")
+        db.execute("INSERT INTO athletes(name,birth,sex) VALUES(?,?,?)",('Histórico','2000-01-01','Masculino'))
+        db.commit();db.close()
+
+    def test_migrates_v1_database_preserving_data(self):
+        self._legacy_v1_database()
+        s=Store(self.path)
+        try:
+            self.assertEqual(s.db.execute("PRAGMA user_version").fetchone()[0],LATEST_VERSION)
+            rows=s.rows("SELECT * FROM athletes")
+            self.assertEqual(len(rows),1)
+            self.assertEqual(rows[0]['name'],'Histórico')
+            # Migrar no activa el umbral de seguimiento para datos existentes.
+            self.assertIsNone(rows[0]['orthostatic_threshold'])
+            # Se conservó una copia previa a la migración.
+            backups=list(self.path.parent.glob('antes_migrar_v1_*.sqlite3'))
+            self.assertEqual(len(backups),1)
+        finally:
+            s.db.close()
+
+    def test_rejects_database_from_newer_version(self):
+        db=sqlite3.connect(self.path)
+        db.execute(f"PRAGMA user_version={LATEST_VERSION + 1}")
+        db.commit();db.close()
+        with self.assertRaises(ValueError):
+            Store(self.path)
+
+    def test_does_not_reset_version_on_reopen(self):
+        s=Store(self.path);s.db.close()
+        s2=Store(self.path)
+        try:
+            self.assertEqual(s2.db.execute("PRAGMA user_version").fetchone()[0],LATEST_VERSION)
+        finally:
+            s2.db.close()
+
+    def test_restore_upgrades_older_backup(self):
+        self._legacy_v1_database()
+        live=Store(self.path.parent/'live.sqlite3')
+        try:
+            before=live.restore(self.path)
+            self.assertTrue(Path(before).is_file())
+            rows=live.rows("SELECT * FROM athletes")
+            self.assertEqual(rows[0]['name'],'Histórico')
+            self.assertIsNone(rows[0]['orthostatic_threshold'])
+            self.assertEqual(live.db.execute("PRAGMA user_version").fetchone()[0],LATEST_VERSION)
+        finally:
+            live.db.close()
 
 
 if __name__=='__main__':

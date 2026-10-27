@@ -12,6 +12,9 @@ planificados, sesiones realizadas, progreso e informes imprimibles.
 > deben probarse con datos ficticios antes de usar información real de
 > deportistas. El programa **no** sustituye valoración médica o deportiva
 > profesional y no incluye validación clínica de las cargas de entrenamiento.
+> Existe además una interfaz Android (Kivy); su código se probó
+> funcionalmente en un PC pero **no se generó ni se probó un APK real**
+> (ver [Versión Android](#versión-android) y `BUILD_ANDROID.md`).
 
 ## Tabla de contenido
 
@@ -28,6 +31,7 @@ planificados, sesiones realizadas, progreso e informes imprimibles.
   - [7. Ayuda y copias](#7-ayuda-y-copias)
 - [Dónde quedan los datos y cómo respaldarlos](#dónde-quedan-los-datos-y-cómo-respaldarlos)
 - [Crear el ejecutable para Windows](#crear-el-ejecutable-para-windows)
+- [Versión Android](#versión-android)
 - [Pruebas automatizadas](#pruebas-automatizadas)
 - [Organización del código](#organización-del-código)
 - [Límites y fundamento del modelo](#límites-y-fundamento-del-modelo)
@@ -135,7 +139,12 @@ frecuencia cardíaca. Para un conteo manual de latidos:
 
 Con 6 segundos de conteo, un latido de diferencia equivale a 10 lpm. Esta
 pestaña incluye también la **calculadora ortostática** (FC acostado vs. FC de
-pie; una diferencia mayor a 15 lpm es un criterio orientativo, no diagnóstico).
+pie): la diferencia se calcula siempre, pero solo se marca si activó un
+**umbral de seguimiento postural opcional** para ese deportista (botón
+dedicado; desactivado por defecto para cualquier deportista nuevo o
+existente). El valor histórico de referencia era 15 lpm, pero es una
+decisión del entrenador, no un umbral validado clínicamente ni un
+diagnóstico automático de sobreentrenamiento.
 
 ### 3. Referencias
 
@@ -256,6 +265,27 @@ guarda fuera del programa (ver sección anterior). PyInstaller empaqueta Python
 y sus dependencias; no convierte la aplicación en un dispositivo médico ni
 valida la metodología de entrenamiento.
 
+## Versión Android
+
+Existe una interfaz táctil para Android ([`main.py`](main.py) +
+[`mobile/`](mobile)), construida con [Kivy](https://kivy.org/doc/stable/) y
+empaquetada con [Buildozer](https://buildozer.readthedocs.io/). Reutiliza
+`core.py` y `historical.py` sin duplicar ningún cálculo ni regla de negocio;
+no importa Tkinter ni ningún componente exclusivo de Windows. Cubre las
+mismas ocho secciones que la versión de escritorio (Inicio, Deportistas,
+Ficha, Mediciones, Referencias y planificación, Sesiones, Progreso, Ajustes),
+con botones y campos grandes, teclado numérico, aceptación de coma decimal,
+conservación de borradores, botón Atrás de Android y exportación/restauración
+de copias mediante el Storage Access Framework.
+
+- Manual de uso para entrenadores: [`MANUAL_ANDROID.md`](MANUAL_ANDROID.md).
+- Guía de compilación, firma y mantenimiento del APK/AAB, versiones
+  comprobadas y estado real de las pruebas realizadas:
+  [`BUILD_ANDROID.md`](BUILD_ANDROID.md).
+- Probar la interfaz en un PC sin dispositivo Android: ver
+  [`requirements-mobile.txt`](requirements-mobile.txt) y la sección
+  correspondiente de `BUILD_ANDROID.md`.
+
 ## Pruebas automatizadas
 
 ```bat
@@ -266,19 +296,29 @@ Las pruebas cubren cálculo de edad, conteo manual de pulso, Karvonen/Tanaka,
 rechazo de la calculadora adulta en menores, validación de entradas,
 conservación de totales al redondear, mezcla de unidades, referencias
 históricas, planes congelados, aislamiento entre deportistas, carga de
-sesión, validación de recuperación, copia/restauración y escape de informes.
+sesión, validación de recuperación, copia/restauración, escape de informes,
+el umbral opcional de seguimiento postural (desactivado por defecto, sin
+mensajes diagnósticos) y la migración versionada del esquema SQLite
+(conservación de datos, copia previa automática, rechazo de versiones más
+nuevas y restauración de copias de versiones anteriores).
 
 ## Organización del código
 
 | Archivo | Función |
 |---|---|
-| [`app.py`](app.py) | Interfaz Tkinter/ttk: formularios, tablas, ayuda y exportación. |
-| [`core.py`](core.py) | Validación, cálculos, SQLite, auditoría, copias e informes HTML/SVG. |
+| [`app.py`](app.py) | Interfaz Tkinter/ttk (Windows): formularios, tablas, ayuda y exportación. |
+| [`main.py`](main.py) | Punto de entrada de la interfaz Android (Kivy). |
+| [`mobile/`](mobile) | Pantallas, formularios táctiles y servicios Android (rutas, SAF) de la versión móvil. |
+| [`core.py`](core.py) | Validación, cálculos, SQLite, migraciones, auditoría, copias e informes HTML/SVG — compartido por Windows y Android. |
 | [`historical.py`](historical.py) | Valores del Excel original del convenio, sin dependencia de Excel. |
 | [`test_core.py`](test_core.py) | Pruebas unitarias y de integración con bases temporales. |
-| [`iniciar_windows.cmd`](iniciar_windows.cmd) | Inicio desde el código fuente. |
+| [`iniciar_windows.cmd`](iniciar_windows.cmd) | Inicio desde el código fuente (Windows). |
 | [`crear_exe_windows.cmd`](crear_exe_windows.cmd) | Preparación del ejecutable en Windows. |
-| [`MANUAL.html`](MANUAL.html) | Manual detallado para abrir y leer en el navegador. |
+| [`buildozer.spec`](buildozer.spec) | Configuración de empaquetado del APK/AAB de Android. |
+| [`requirements-mobile.txt`](requirements-mobile.txt) | Dependencias solo para probar la interfaz Android en un PC. |
+| [`MANUAL.html`](MANUAL.html) | Manual detallado (Windows) para abrir y leer en el navegador. |
+| [`MANUAL_ANDROID.md`](MANUAL_ANDROID.md) | Manual breve para entrenadores (Android). |
+| [`BUILD_ANDROID.md`](BUILD_ANDROID.md) | Guía de compilación, firma y mantenimiento del APK/AAB. |
 | [`EJEMPLO_INFORME.html`](EJEMPLO_INFORME.html) | Informe de ejemplo con datos ficticios. |
 | [`LEAME.md`](LEAME.md) | Manual extendido en español (fuentes consultadas, detalle técnico, prueba piloto). |
 

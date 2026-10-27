@@ -3,6 +3,16 @@
 versiones_compilacion.txt
 *.sqlite3
 
+# TKD Entrenador Android: artefactos de compilacion de Buildozer/python-for-android.
+# NUNCA versionar claves de firma ni datos reales de deportistas.
+.buildozer/
+bin/
+*.apk
+*.aab
+*.keystore
+*.jks
+mobile_dev_data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -158,6 +168,7 @@ activemq-data/
 .env
 .envrc
 .venv
+.venv_kivy/
 env/
 venv/
 ENV/

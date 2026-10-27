@@ -1,0 +1,18 @@
+# Dependencias para PROBAR la interfaz Android (Kivy) en un PC de desarrollo,
+# sin necesidad de un dispositivo ni de compilar un APK.
+#
+# La versión Windows (app.py) NO necesita nada de este archivo: sigue
+# dependiendo solo de la biblioteca estándar (ver requirements.txt).
+#
+# Instalación (requiere Python 3.9–3.13; Kivy 2.3.1 no publica ruedas para
+# versiones de Python más nuevas en la fecha de esta nota, 26-10-2026):
+#   python -m venv .venv_kivy
+#   .venv_kivy\Scripts\pip install -r requirements-mobile.txt
+#   .venv_kivy\Scripts\python main.py
+#
+# plyer y pyjnius son específicos de Android: en escritorio no se usan
+# (mobile/paths.py tiene una alternativa de escritorio con FileChooser de
+# Kivy), pero se listan aquí para que `pip check` no se queje de que
+# faltan si se importan condicionalmente en alguna prueba.
+kivy==2.3.1
+plyer

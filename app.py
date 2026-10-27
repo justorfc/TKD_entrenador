@@ -12,7 +12,7 @@ import webbrowser
 
 from core import (VERSION, CATEGORIES, UNITS, PHASES, MEASURE_TYPES, Store,
                   data_directory, age_on, adult_hr, manual_pulse, orthostatic_risk,
-                  composition, report_html, export_sessions)
+                  ORTHOSTATIC_NEUTRAL_MESSAGE, composition, report_html, export_sessions)
 from historical import HISTORICAL
 
 HELP = """TKD ENTRENADOR · GUÍA RÁPIDA
@@ -56,10 +56,13 @@ PRESIÓN ARTERIAL Y PRUEBA ORTOSTÁTICA
 Registre presión arterial sistólica y diastólica (mmHg) como mediciones,
 con fecha, método/dispositivo y postura, igual que el resto de valores.
 Prueba ortostática: FC acostado tras reposo y FC de pie al levantarse.
-Criterio histórico: una diferencia superior a 15 lpm se asociaba a riesgo
-de sobreentrenamiento. No es un diagnóstico; requiere criterio del
-entrenador y, si procede, valoración clínica. Use la calculadora dedicada
-y registre también ambos valores en Mediciones.
+La diferencia (de pie − acostado) se calcula siempre; evaluarla contra un
+umbral es opcional y se configura por deportista en «Umbral de seguimiento
+postural» (NO activado por defecto; el valor histórico de referencia era
+15 lpm). Superar el umbral no es un diagnóstico ni indica por sí mismo
+sobreentrenamiento: requiere revisar condiciones de medición y contexto
+junto con el entrenador y, si procede, valoración clínica. Use la
+calculadora dedicada y registre también ambos valores en Mediciones.
 
 CARGAS
 Volumen: cantidad × porcentaje de referencia / 100.
@@ -232,7 +235,7 @@ class App(tk.Tk):
 
     def make_measurements(self):
         tab=self.tabs['Mediciones']
-        self.buttons(tab,[("Nueva medición",self.new_measurement),("Anular selección",lambda:self.void('measurements',self.mt)),("Convertir conteo manual",self.pulse_tool),("Calculadora FC adulta",self.hr_tool),("Prueba ortostática (acostado/de pie)",self.orthostatic_tool)])
+        self.buttons(tab,[("Nueva medición",self.new_measurement),("Anular selección",lambda:self.void('measurements',self.mt)),("Convertir conteo manual",self.pulse_tool),("Calculadora FC adulta",self.hr_tool),("Prueba ortostática (acostado/de pie)",self.orthostatic_tool),("Umbral de seguimiento postural",self.orthostatic_threshold_tool)])
         ttk.Label(tab,text="PR/bpm = pulso; SpO₂/% = saturación. Un pulso leído después del esfuerzo se registra como recuperación. Registre también la presión arterial (sistólica y diastólica) como mediciones.",wraplength=1030).pack(anchor="w",pady=8)
         self.mt=self.tree(tab,[('date','Fecha',100),('kind','Medición',160),('value','Valor',90),('method','Método / postura',220),('delay_seconds','Seg. tras fin',100),('notes','Observaciones',220)])
 
@@ -250,12 +253,25 @@ class App(tk.Tk):
         Form(self,"Conversión de conteo manual",[('beats','Latidos contados','',None),('seconds','Duración del conteo, segundos',6,None)],calculate)
 
     def orthostatic_tool(self):
-        self.need_athlete()
+        a=self.need_athlete()
+        threshold=a['orthostatic_threshold']
         def calculate(v):
-            r=orthostatic_risk(v['supine'],v['standing'])
-            aviso="Riesgo de sobreentrenamiento según este criterio histórico." if r['risk'] else "Diferencia dentro del criterio histórico (≤15 lpm)."
-            return f"FC acostado: {r['supine']:.0f} lpm · FC de pie: {r['standing']:.0f} lpm\nDiferencia: {r['difference']:.0f} lpm\n{aviso}\nCriterio histórico, no diagnóstico: requiere valoración del entrenador y, si procede, clínica."
+            r=orthostatic_risk(v['supine'],v['standing'],threshold)
+            if r['flagged'] is None:
+                aviso="Sin umbral de seguimiento configurado para este deportista (opcional, botón «Umbral de seguimiento postural»)."
+            elif r['flagged']:
+                aviso=ORTHOSTATIC_NEUTRAL_MESSAGE
+            else:
+                aviso=f"Diferencia dentro del umbral de seguimiento configurado (≤{threshold:g} lpm)."
+            return f"FC acostado: {r['supine']:.0f} lpm · FC de pie: {r['standing']:.0f} lpm\nDiferencia: {r['difference']:.0f} lpm\n{aviso}\nCriterio personal de seguimiento, no diagnóstico: no sustituye el criterio del entrenador ni, si procede, una valoración clínica."
         Form(self,"Prueba ortostática",[('supine','FC acostado tras reposo (lpm)','',None),('standing','FC de pie, inmediatamente al levantarse (lpm)','',None)],calculate,"Protocolo histórico: reposar acostado unos minutos, medir la FC, levantarse y medir de inmediato de pie. Registre también ambos valores en Mediciones (FC acostado / FC de pie).")
+
+    def orthostatic_threshold_tool(self):
+        a=self.need_athlete()
+        fields=[('threshold','Umbral de seguimiento (lpm, vacío = desactivado)',a['orthostatic_threshold'] if a['orthostatic_threshold'] is not None else '',None)]
+        def save(v):
+            self.store.set_orthostatic_threshold(self.athlete_id,v['threshold']);self.select_athlete()
+        Form(self,"Umbral de seguimiento postural",fields,save,"Opcional. No está activado por defecto en ningún deportista. Es un criterio personal de seguimiento, no un valor validado como diagnóstico. El valor histórico de referencia era 15 lpm.")
 
     def hr_tool(self):
         a=self.need_athlete()

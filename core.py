@@ -58,18 +58,37 @@ def manual_pulse(beats, seconds):
     return number(beats, "Latidos", 1) * 60 / number(seconds, "Segundos", 1)
 
 
-def orthostatic_risk(supine, standing, threshold=15):
-    """Prueba ortostática histórica: acostado tras reposo frente a de pie inmediato.
+ORTHOSTATIC_NEUTRAL_MESSAGE = ("Diferencia superior al umbral de seguimiento configurado. "
+                                "Revisar condiciones de medición y contexto.")
 
-    Criterio histórico de uso frecuente: una diferencia superior a 15 lpm se
-    asociaba a riesgo de sobreentrenamiento. No es un diagnóstico ni sustituye
-    el criterio del entrenador ni una valoración clínica.
+
+def orthostatic_risk(supine, standing, threshold=None):
+    """Evaluación postural: FC acostado tras reposo frente a FC de pie inmediata.
+
+    Calcula siempre la diferencia con signo (`pie - acostado`) a partir de una
+    misma evaluación; no empareja mediciones de días distintos. `threshold` es
+    un criterio personal de seguimiento OPCIONAL y configurable por el
+    entrenador para cada deportista (por ejemplo, el valor histórico de 15
+    lpm). Si `threshold` es None (valor por defecto, también el de cualquier
+    deportista nuevo) la diferencia no se evalúa contra ningún umbral: la
+    marca `flagged` queda en None y no se emite ningún aviso.
+
+    Superar el umbral NO es un diagnóstico, no implica sospecha clínica
+    automática ni probabilidad de sobreentrenamiento, y no debe traducirse en
+    cambios automáticos de carga ni en una declaración de aptitud. Es un
+    criterio personal de seguimiento que el entrenador decide activar; ante
+    un umbral superado conviene revisar condiciones de medición y contexto
+    junto con el deportista.
     """
     supine_hr = number(supine, "FC acostado", 1, 300)
     standing_hr = number(standing, "FC de pie", 1, 300)
     difference = standing_hr - supine_hr
+    flagged = None
+    if threshold not in (None, ""):
+        flagged = difference > number(threshold, "Umbral de seguimiento", 0)
     return {"supine": supine_hr, "standing": standing_hr, "difference": difference,
-            "risk": difference > number(threshold, "Umbral", 0)}
+            "threshold": None if threshold in (None, "") else number(threshold, "Umbral de seguimiento", 0),
+            "flagged": flagged}
 
 
 def adult_hr(birth, when, resting, intensity, assessed_max=None):
@@ -155,7 +174,7 @@ def data_directory():
     return root
 
 
-SCHEMA = """
+SCHEMA_V1 = """
 CREATE TABLE IF NOT EXISTS athletes (
  id INTEGER PRIMARY KEY, name TEXT NOT NULL, birth TEXT NOT NULL,
  sex TEXT NOT NULL, experience TEXT NOT NULL DEFAULT '',
@@ -194,13 +213,21 @@ CREATE TABLE IF NOT EXISTS audit (
  id INTEGER PRIMARY KEY, timestamp TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS measure_athlete_date ON measurements(athlete_id,date);
 CREATE INDEX IF NOT EXISTS sessions_athlete_date ON sessions(athlete_id,date);
-PRAGMA user_version=1;
 """
+
+# Migraciones versionadas: cada clave aplica los cambios necesarios para pasar
+# de la versión anterior a esa versión. No se reescriben registros existentes.
+MIGRATIONS = {
+    # v2: umbral de seguimiento postural opcional por deportista (ver
+    # orthostatic_risk). NULL = sin configurar; no se activa por defecto.
+    2: "ALTER TABLE athletes ADD COLUMN orthostatic_threshold REAL;",
+}
+LATEST_VERSION = max(MIGRATIONS, default=1)
 
 
 class Store:
     """SQLite local. Escrituras atómicas, parámetros SQL y copias mediante backup()."""
-    def __init__(self, path):
+    def __init__(self, path, backup_before_migration=True):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(self.path)
@@ -208,10 +235,37 @@ class Store:
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.execute("PRAGMA busy_timeout=5000")
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0, 1):
+        if version > LATEST_VERSION:
             self.db.close()
-            raise ValueError("Base creada por otra versión. No se modificará.")
-        self.db.executescript(SCHEMA)
+            raise ValueError("Base creada por una versión más reciente de la aplicación. No se modificará.")
+        fresh = version == 0
+        if fresh:
+            # Base nueva: crea el esquema base y lo deja en la versión 1 antes
+            # de aplicar, a continuación, las mismas migraciones incrementales
+            # que una base antigua (sin duplicar la definición del esquema).
+            self.db.executescript(SCHEMA_V1)
+            self.db.execute("PRAGMA user_version=1")
+            version = 1
+        else:
+            self.db.executescript(SCHEMA_V1)
+        self._migrate_to_latest(version, backup_before_migration and not fresh)
+
+    def _migrate_to_latest(self, version, backup_before_migration):
+        """Aplica, en orden, las migraciones pendientes hasta LATEST_VERSION."""
+        if version >= LATEST_VERSION:
+            return
+        if backup_before_migration:
+            marker = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            other = sqlite3.connect(self.path.with_name(f"antes_migrar_v{version}_{marker}.sqlite3"))
+            try:
+                with other:
+                    self.db.backup(other)
+            finally:
+                other.close()
+        for target in range(version + 1, LATEST_VERSION + 1):
+            self.db.executescript(MIGRATIONS[target])
+            self.db.execute(f"PRAGMA user_version={target}")
+        self.db.commit()
 
     def rows(self, sql, args=()):
         return [dict(r) for r in self.db.execute(sql, args)]
@@ -246,6 +300,21 @@ class Store:
                 athlete_id = self.db.execute("INSERT INTO athletes(name,birth,sex,experience,guardian,notes) VALUES(?,?,?,?,?,?)", values).lastrowid
                 self.audit("Crear deportista", {"id": athlete_id})
         return athlete_id
+
+    def set_orthostatic_threshold(self, athlete_id, threshold):
+        """Activa/desactiva el criterio personal de seguimiento postural.
+
+        `threshold` vacío o None desactiva la evaluación (comportamiento por
+        defecto para cualquier deportista, nuevo o existente). Un valor
+        numérico activa la marca `flagged` de orthostatic_risk para ese
+        umbral; no se trata de un valor validado clínicamente.
+        """
+        self.athlete(athlete_id)
+        value = None if threshold in (None, "") else number(threshold, "Umbral de seguimiento postural", 0)
+        with self.db:
+            self.db.execute("UPDATE athletes SET orthostatic_threshold=? WHERE id=?", (value, athlete_id))
+            self.audit("Configurar umbral de seguimiento postural", {"athlete_id": athlete_id, "threshold": value})
+        return value
 
     def check_record_date(self, athlete_id, when, future=False):
         d = iso_date(when)
@@ -394,10 +463,16 @@ class Store:
             raise ValueError("Seleccione una copia existente, diferente de la base activa.")
         other = sqlite3.connect(source.as_uri()+"?mode=ro",uri=True)
         try:
-            if other.execute("PRAGMA integrity_check").fetchone()[0] != "ok" or other.execute("PRAGMA user_version").fetchone()[0] != 1:
+            other_version = other.execute("PRAGMA user_version").fetchone()[0]
+            if other.execute("PRAGMA integrity_check").fetchone()[0] != "ok" or not (1 <= other_version <= LATEST_VERSION):
                 raise ValueError("La copia no es válida o corresponde a otra versión.")
             for table in ("athletes","measurements","refs","plans","items","sessions","audit"):
                 expected = [tuple(r)[1:3] for r in self.db.execute(f"PRAGMA table_info({table})")]
+                # Una copia de una versión anterior legítimamente carece de las
+                # columnas añadidas por migraciones posteriores a su versión;
+                # se excluyen de la comparación en lugar de rechazar la copia.
+                if table == "athletes" and other_version < 2:
+                    expected = [c for c in expected if c[0] != "orthostatic_threshold"]
                 actual = [tuple(r)[1:3] for r in other.execute(f"PRAGMA table_info({table})")]
                 if actual != expected:
                     raise ValueError("La estructura de la copia no corresponde a esta aplicación.")
@@ -408,6 +483,9 @@ class Store:
             other.backup(self.db)
         finally:
             other.close()
+        # Una copia de una versión anterior se actualiza a la versión vigente
+        # (ya se guardó "before"; no hace falta otra copia aquí).
+        self._migrate_to_latest(other_version, backup_before_migration=False)
         return before
 
 
